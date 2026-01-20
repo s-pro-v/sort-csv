@@ -1796,7 +1796,7 @@ function loadDataFromC3() {
                         appState.csvEditor.setValue(csvData);
                         appState.rawData = csvData;
                         handleDataParsed(csvData);
-                        showToast("Dane załadowane z c3.html", "success");
+                        showToast("Data loaded from incsvdev.carrd.co", "success");
 
                         // Switch to editor view if not already
                         if (appState.inputViewMode !== "editor") {
@@ -1821,7 +1821,7 @@ function loadDataFromC3() {
             }
         }
     } catch (err) {
-        console.error('Error loading data from c3.html:', err);
+        console.error('Error loading data from incsvdev.carrd.co:', err);
     }
 }
 
