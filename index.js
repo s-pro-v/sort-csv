@@ -1784,13 +1784,18 @@ function loadBuffer(id) {
 
 function loadDataFromC3() {
     try {
-        const csvData = localStorage.getItem('csv_data_from_c3');
-        const timestamp = localStorage.getItem('csv_data_from_c3_timestamp');
+        // Check URL parameters for data from c3.html
+        const urlParams = new URLSearchParams(window.location.search);
+        const encodedData = urlParams.get('data');
+        const timestamp = urlParams.get('timestamp');
 
-        if (csvData && timestamp) {
+        if (encodedData && timestamp) {
             // Check if data is recent (within last 10 seconds) to avoid loading old data
             const dataAge = Date.now() - parseInt(timestamp);
             if (dataAge < 10000) {
+                // Decode base64 data
+                const csvData = decodeURIComponent(escape(atob(encodedData)));
+
                 const loadData = () => {
                     if (appState.csvEditor) {
                         appState.csvEditor.setValue(csvData);
@@ -1803,9 +1808,9 @@ function loadDataFromC3() {
                             toggleInputViewMode();
                         }
 
-                        // Clear the data from localStorage
-                        localStorage.removeItem('csv_data_from_c3');
-                        localStorage.removeItem('csv_data_from_c3_timestamp');
+                        // Clean URL by removing parameters
+                        const cleanUrl = window.location.href.split('?')[0];
+                        window.history.replaceState({}, document.title, cleanUrl);
                     } else {
                         // Editor not ready yet, try again after a short delay
                         setTimeout(loadData, 100);
@@ -1815,7 +1820,38 @@ function loadDataFromC3() {
                 // Start loading process
                 loadData();
             } else {
-                // Data is too old, remove it
+                // Data is too old, clean URL
+                const cleanUrl = window.location.href.split('?')[0];
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+
+        // Also check localStorage as fallback (for same-domain usage)
+        const localStorageData = localStorage.getItem('csv_data_from_c3');
+        const localStorageTimestamp = localStorage.getItem('csv_data_from_c3_timestamp');
+
+        if (localStorageData && localStorageTimestamp && !encodedData) {
+            const dataAge = Date.now() - parseInt(localStorageTimestamp);
+            if (dataAge < 10000) {
+                const loadData = () => {
+                    if (appState.csvEditor) {
+                        appState.csvEditor.setValue(localStorageData);
+                        appState.rawData = localStorageData;
+                        handleDataParsed(localStorageData);
+                        showToast("Dane załadowane z c3.html", "success");
+
+                        if (appState.inputViewMode !== "editor") {
+                            toggleInputViewMode();
+                        }
+
+                        localStorage.removeItem('csv_data_from_c3');
+                        localStorage.removeItem('csv_data_from_c3_timestamp');
+                    } else {
+                        setTimeout(loadData, 100);
+                    }
+                };
+                loadData();
+            } else {
                 localStorage.removeItem('csv_data_from_c3');
                 localStorage.removeItem('csv_data_from_c3_timestamp');
             }
@@ -2428,12 +2464,15 @@ function init() {
         // Setup event listeners
         setupEventListeners();
 
-        // Listen for storage events from c3.html
+        // Listen for storage events from c3.html (for same-domain usage)
         window.addEventListener('storage', (e) => {
             if (e.key === 'csv_data_from_c3' && e.newValue) {
                 loadDataFromC3();
             }
         });
+
+        // Check URL parameters on page load (for cross-domain usage)
+        loadDataFromC3();
 
         // Initialize UI and render current view
         renderCurrentView();
@@ -2449,9 +2488,6 @@ function init() {
             initializeCodeMirrorEditor();
             // Initialize reset button states (disabled by default)
             updateResetButtonStates();
-
-            // Check for data from c3.html
-            loadDataFromC3();
         }, 100);
 
     } catch (error) {
